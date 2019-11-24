@@ -1,4 +1,6 @@
 import time
+from io import StringIO
+
 from bottle import get, static_file, run
 import requests
 import os
@@ -6,7 +8,7 @@ from flights import flights
 from threading import  Thread
 from urllib import parse
 from lxml import etree
-
+from bs4 import BeautifulSoup
 
 def download_and_save(uri):
     parsed_uri = parse.urlparse(uri)
@@ -32,12 +34,10 @@ def replace_url(url):
     return  parse.urlunparse(replaced).rstrip('/')
 
 def setup_module(module):
-    for f in flights:
-        f["url"] = replace_url(f["url"])
-
     @get("/")
-    def index():
-        return static_file("index.html", root="html")
+    @get("/<file>")
+    def index(file):
+        return static_file(file or "index.html", root="html")
 
     @get("/<provider>/<uri:path>/")
     @get("/<provider>/<uri:path>")
@@ -64,27 +64,25 @@ def teardown_module():
 
 def test_downloadAndSave():
     for f in flights:
-        r = requests.get(f["url"])
+        r = requests.get(replace_url(f["url"]))
         assert r.status_code == 200
 
 def test_transformXSLT():
-    r = requests.get("http://localhost:8088/www.astroportal.com/tageshoroskope/fische")
-    dom = etree.HTML(r.text)
+    base_url = "http://localhost:8088/www.astrolantis.de/tageshoroskop-fische.php"
+    r = requests.get(base_url)
+    html_soup = BeautifulSoup(r.text, 'lxml')
+    html = str(html_soup)
+    dom = etree.HTML(text=html, base_url=base_url)
 
-    for bad in dom.xpath("//script"):
-        bad.getparent().remove(bad)
-
-    dom_string = etree.tostring(dom)
-    dom = etree.HTML(dom_string)
-    xslt = etree.parse("../lib/astroportal.xslt")
+    xslt = etree.parse('../lib/astroportal.xslt')
     transform = etree.XSLT(xslt)
-    newdom = transform(dom)
-    print(etree.tostring(newdom, pretty_print=True))
+    newdom = transform(dom, uri="'%s'" % base_url)
+    newdom_string = str(newdom)
 
     os.makedirs("compiled", 0o777, True)
-    f = open("compiled/out.html", "wb")
-    f.write(etree.tostring(newdom, pretty_print=True))
+    f = open("compiled/out.html", "w")
+    f.write(newdom_string)
     f.close()
     f = open("compiled/aw.html", "wb")
     f.write(etree.tostring(dom, pretty_print=True))
-    f.close
+    f.close()
