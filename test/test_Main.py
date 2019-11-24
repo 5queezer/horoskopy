@@ -1,16 +1,11 @@
-import sys
 import time
-from unittest import mock
-
-import pytest
-from unittest.mock import MagicMock, patch
-from queue import Queue
 from bottle import get, static_file, run
 import requests
 import os
-from Main import flights, scrape
+from flights import flights
 from threading import  Thread
 from urllib import parse
+from lxml import etree
 
 
 def download_and_save(uri):
@@ -72,12 +67,24 @@ def test_downloadAndSave():
         r = requests.get(f["url"])
         assert r.status_code == 200
 
-def test_CacheAllSites():
-    results = {}
-    for f in flights:
-        try:
-            scrape_result = scrape(f)
-            results[f["name"]] = scrape_result
-        except FileNotFoundError:
-            pytest.fail(f["url"] + " not found")
-    pass
+def test_transformXSLT():
+    r = requests.get("http://localhost:8088/www.astroportal.com/tageshoroskope/fische")
+    dom = etree.HTML(r.text)
+
+    for bad in dom.xpath("//script"):
+        bad.getparent().remove(bad)
+
+    dom_string = etree.tostring(dom)
+    dom = etree.HTML(dom_string)
+    xslt = etree.parse("../lib/astroportal.xslt")
+    transform = etree.XSLT(xslt)
+    newdom = transform(dom)
+    print(etree.tostring(newdom, pretty_print=True))
+
+    os.makedirs("compiled", 0o777, True)
+    f = open("compiled/out.html", "wb")
+    f.write(etree.tostring(newdom, pretty_print=True))
+    f.close()
+    f = open("compiled/aw.html", "wb")
+    f.write(etree.tostring(dom, pretty_print=True))
+    f.close
