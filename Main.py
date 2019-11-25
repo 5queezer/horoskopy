@@ -3,8 +3,21 @@ from threading import  Thread
 import requests
 from bs4 import BeautifulSoup
 import dateparser
-from flights import flights
+from lxml import etree
 
+from flights import flights
+import os
+
+def processZodiacs(lib_dir):
+    lib = lib_dir
+    xslt_files = [f for f in os.listdir(lib) if os.path.isfile(os.path.join(lib, f)) and f.rfind('.xslt')]
+    for f in xslt_files:
+        libpath = "%s/%s" % (lib, f)
+        xslt = etree.parse(libpath)
+        uri_template = xslt.find("{http://www.w3.org/1999/XSL/Transform}variable[@name='uri']").text.strip()
+        zodiacs = xslt.find("{http://www.w3.org/1999/XSL/Transform}variable[@name='zodiacs']").text.strip()
+        for z in zodiacs.split(" "):
+            yield [uri_template % z, xslt]
 
 def scraper_worker(q, data):
     task = q.get()

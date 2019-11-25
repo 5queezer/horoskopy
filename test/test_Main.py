@@ -86,41 +86,35 @@ def test_transformXSLTforOneHoroskope():
     f.close()
 
 def test_downLoadAllZodiacsFromXSLTVariable():
-    lib = "../lib"
-    xslt_files = [f for f in os.listdir(lib) if os.path.isfile(os.path.join(lib, f)) and f.rfind('.xslt')]
-    for f in xslt_files:
-        libpath = "%s/%s" % (lib, f)
-        xslt = etree.parse(libpath)
-        uri_template = xslt.find("{http://www.w3.org/1999/XSL/Transform}variable[@name='uri']").text.strip()
-        zodiacs = xslt.find("{http://www.w3.org/1999/XSL/Transform}variable[@name='zodiacs']").text.strip()
-        for z in zodiacs.split(" "):
-            # build url and download
-            uri = replace_url(uri_template % z)
-            r = requests.get(uri)
-            assert r.status_code == 200
+    from Main import processZodiacs
+    for uri, xslt in processZodiacs('../lib'):
+        # build url and download
+        u = replace_url(uri)
+        r = requests.get(u)
+        assert r.status_code == 200
 
-            # load html into xml parser
-            html_soup = BeautifulSoup(r.text, 'lxml')
-            html = str(html_soup).strip()
-            assert len(html) > 0
+        # load html into xml parser
+        html_soup = BeautifulSoup(r.text, 'lxml')
+        html = str(html_soup).strip()
+        assert len(html) > 0
 
-            # load xslt and transform to xml
-            dom = etree.HTML(html, base_url=uri)
-            transform = etree.XSLT(xslt)
-            newdom = transform(dom, origin="'%s'" % uri)
-            newdom_string = str(newdom)
-            assert len(newdom_string) > 0
+        # load xslt and transform to xml
+        dom = etree.HTML(html, base_url=uri)
+        transform = etree.XSLT(xslt)
+        newdom = transform(dom, origin="'%s'" % uri)
+        newdom_string = str(newdom)
+        assert len(newdom_string) > 0
 
-            uri = parse.urlparse(uri)
-            fs_path = ("transformed/%s/%s/.html" % (uri.netloc,uri.path)).lstrip('/')
-            fs_dir = os.path.dirname(fs_path).lstrip('/')
+        uri = parse.urlparse(uri)
+        fs_path = ("transformed/%s/%s/.html" % (uri.netloc,uri.path)).lstrip('/')
+        fs_dir = os.path.dirname(fs_path).lstrip('/')
 
-            if not os.path.isdir(fs_dir):
-                os.makedirs(fs_dir, mode=0o777, exist_ok=True)
+        if not os.path.isdir(fs_dir):
+            os.makedirs(fs_dir, mode=0o777, exist_ok=True)
 
-            f = open(fs_path, 'w')
-            f.write(newdom_string)
-            f.close()
-            assert os.path.getsize(fs_path) > 0
+        f = open(fs_path, 'w')
+        f.write(newdom_string)
+        f.close()
+        assert os.path.getsize(fs_path) > 0
 
     pass
