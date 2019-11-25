@@ -1,10 +1,7 @@
 import time
-from io import StringIO
-
 from bottle import get, static_file, run
 import requests
 import os
-from flights import flights
 from threading import  Thread
 from urllib import parse
 from lxml import etree
@@ -21,7 +18,7 @@ def download_and_save(uri):
     if(r.status_code != 200):
         raise FileNotFoundError
 
-    filename = os.path.basename("html/%s/%s" % (parsed_uri.netloc, parsed_uri.path.strip('/')))
+    filename = os.path.basename("html/%s/%s.html" % (parsed_uri.netloc, parsed_uri.path.strip('/')))
     path = os.path.dirname("html/%s/%s" % (parsed_uri.netloc, parsed_uri.path.strip('/')))
     os.makedirs(path, 0o777, True)
     file = open(path + '/' + filename, "wb")
@@ -42,7 +39,7 @@ def setup_module(module):
     @get("/<provider>/<uri:path>/")
     @get("/<provider>/<uri:path>")
     def cache(provider, uri):
-        path_file = "html/%s/%s" % (provider, uri)
+        path_file = "html/%s/%s.html" % (provider, uri)
         path = os.path.dirname(path_file)
         filename = os.path.basename(path_file)
         if not os.path.isfile(path_file):
@@ -50,7 +47,7 @@ def setup_module(module):
         return static_file(filename, root=path)
 
     def start_proxy():
-        run(host='127.0.0.1', port=8088, debug=True)
+        run(host='127.0.0.1', port=8088)
 
     global proxy_thread
     proxy_thread = Thread(target=start_proxy)
@@ -62,13 +59,8 @@ def teardown_module():
     print ("Press CTRL+C to stop")
     proxy_thread.join()
 
-def test_downloadAndSave():
-    for f in flights:
-        r = requests.get(replace_url(f["url"]))
-        assert r.status_code == 200
-
 def test_transformXSLTforOneHoroskope():
-    base_url = "http://localhost:8088/www.astroportal.com/tageshoroskope/fische"
+    base_url = replace_url("https://www.astroportal.com/tageshoroskope/fische/")
     r = requests.get(base_url)
     assert r.status_code == 200
 
@@ -82,22 +74,50 @@ def test_transformXSLTforOneHoroskope():
     newdom = transform(dom, origin="'%s'" % base_url)
     newdom_string = str(newdom)
 
-    os.makedirs("compiled", 0o777, True)
-    f = open("compiled/out.html", "w")
+    os.makedirs("transformed", 0o777, True)
+    f = open("transformed/out.html", "w")
     f.write(newdom_string)
     f.close()
-    f = open("compiled/aw.html", "wb")
+    f = open("transformed/aw.html", "wb")
     f.write(etree.tostring(dom, pretty_print=True))
     f.close()
 
 def test_downLoadAllZodiacsFromXSLTVariable():
-    libpath = "../lib"
-    list = os.listdir(libpath)
-    xslt_files = [f for f in os.listdir(libpath) if os.path.isfile(os.path.join(libpath, f)) and f.rfind('.xslt')]
+    lib = "../lib"
+    xslt_files = [f for f in os.listdir(lib) if os.path.isfile(os.path.join(lib, f)) and f.rfind('.xslt')]
     for f in xslt_files:
-        xslt = etree.parse(libpath + '/' + f)
-        uri = xslt.find("{http://www.w3.org/1999/XSL/Transform}variable[@name='uri']").text.strip
-        zodiacs = xslt.find("{http://www.w3.org/1999/XSL/Transform}variable[@name='zodiacs']").text.strip
+        libpath = "%s/%s" % (lib, f)
+        xslt = etree.parse(libpath)
+        uri_template = xslt.find("{http://www.w3.org/1999/XSL/Transform}variable[@name='uri']").text.strip()
+        zodiacs = xslt.find("{http://www.w3.org/1999/XSL/Transform}variable[@name='zodiacs']").text.strip()
+        for z in zodiacs.split(" "):
+            # build url and download
+            uri = replace_url(uri_template % z)
+            r = requests.get(uri)
+            assert r.status_code == 200
 
-        pass
+            # load html into xml parser
+            html_soup = BeautifulSoup(r.text, 'lxml')
+            html = str(html_soup).strip()
+            assert len(html) > 0
+
+            # load xslt and transform to xml
+            dom = etree.HTML(html, base_url=uri)
+            transform = etree.XSLT(xslt)
+            newdom = transform(dom, origin="'%s'" % uri)
+            newdom_string = str(newdom)
+            assert len(newdom_string) > 0
+
+            uri = parse.urlparse(uri)
+            fs_path = ("transformed" + uri.path + ".html").lstrip('/')
+            fs_dir = os.path.dirname(fs_path).lstrip('/')
+
+            if not os.path.isdir(fs_dir):
+                os.makedirs(fs_dir, mode=0o777, exist_ok=True)
+
+            f = open(fs_path, 'w')
+            f.write(newdom_string)
+            f.close()
+            assert os.path.getsize(fs_path) > 0
+
     pass

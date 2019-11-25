@@ -7,7 +7,7 @@
 <xsl:variable name="zodiacs">
     widder stier zwillinge krebs loewe jungfrau waage skorpion schuetze steinbock wassermann fische
 </xsl:variable>
-<xsl:template match="/html" >
+<xsl:template match="/html">
     <html lang="de">
         <head>
             <meta name="url" content="{$origin}"/>
@@ -15,7 +15,8 @@
         </head>
         <body>
             <dl>
-                <xsl:for-each select="body//div[@class='horoscope-item-right']/h3">
+                <xsl:for-each select=".//div[@class='horoscope-item-right']/h3">
+                    <p>test</p>
                     <dt><xsl:value-of select="text()"/></dt>
                     <dd><xsl:value-of select="following-sibling::p[1]/text()"/></dd>
                 </xsl:for-each>
