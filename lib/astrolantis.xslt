@@ -15,7 +15,7 @@
         </head>
         <body>
             <dl>
-                <xsl:for-each select=".//div[@class='horoscope-item-right']/h3">
+                <xsl:for-each select="[@class='horoscope-item-right']/h3">
                     <p>test</p>
                     <dt><xsl:value-of select="text()"/></dt>
                     <dd><xsl:value-of select="following-sibling::p[1]/text()"/></dd>

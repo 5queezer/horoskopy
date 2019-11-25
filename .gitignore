@@ -1,3 +1,5 @@
-test/html/
+!test/html/index.html
+test/html
 test/compiled/
 test/transformed/
+ghostdriver.log

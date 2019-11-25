@@ -32,6 +32,9 @@ def replace_url(url):
 
 def setup_module(module):
     @get("/")
+    def index():
+        return static_file("index.html", root="html")
+
     @get("/<file>")
     def index(file):
         return static_file(file or "index.html", root="html")
@@ -109,7 +112,7 @@ def test_downLoadAllZodiacsFromXSLTVariable():
             assert len(newdom_string) > 0
 
             uri = parse.urlparse(uri)
-            fs_path = ("transformed" + uri.path + ".html").lstrip('/')
+            fs_path = ("transformed/%s/%s/.html" % (uri.netloc,uri.path)).lstrip('/')
             fs_dir = os.path.dirname(fs_path).lstrip('/')
 
             if not os.path.isdir(fs_dir):
