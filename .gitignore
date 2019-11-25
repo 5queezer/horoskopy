@@ -1,4 +1,4 @@
-!test/html/index.html
+!test/static/index.html
 test/html
 test/compiled/
 test/transformed/

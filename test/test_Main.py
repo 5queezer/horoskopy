@@ -1,4 +1,5 @@
 import time
+import pytest
 from bottle import get, static_file, run
 import requests
 import os
@@ -33,11 +34,11 @@ def replace_url(url):
 def setup_module(module):
     @get("/")
     def index():
-        return static_file("index.html", root="html")
+        return static_file("index.html", root="static")
 
     @get("/<file>")
     def index(file):
-        return static_file(file or "index.html", root="html")
+        return static_file(file, root="static")
 
     @get("/<provider>/<uri:path>/")
     @get("/<provider>/<uri:path>")
@@ -62,51 +63,27 @@ def teardown_module():
     print ("Press CTRL+C to stop")
     proxy_thread.join()
 
-def test_transformXSLTforOneHoroskope():
-    base_url = replace_url("https://www.astroportal.com/tageshoroskope/fische/")
-    r = requests.get(base_url)
-    assert r.status_code == 200
-
-    html_soup = BeautifulSoup(r.text, 'lxml')
-    html = str(html_soup).strip()
-    assert len(html) > 0
-
-    dom = etree.HTML(html, base_url=base_url)
-    xslt = etree.parse('../lib/astroportal.xslt')
-    transform = etree.XSLT(xslt)
-    newdom = transform(dom, origin="'%s'" % base_url)
-    newdom_string = str(newdom)
+def test_transformXSLTforOne():
+    base_url = replace_url("https://www.horoscope.com/us/horoscopes/general/horoscope-general-daily-today.aspx?sign=12")
+    xslt = etree.parse('../lib/horoscopecom.xslt')
+    from Main import downloadAndTransform
+    newdom_string = downloadAndTransform(base_url, xslt)
 
     os.makedirs("transformed", 0o777, True)
     f = open("transformed/out.html", "w")
     f.write(newdom_string)
     f.close()
-    f = open("transformed/aw.html", "wb")
-    f.write(etree.tostring(dom, pretty_print=True))
-    f.close()
 
+#@pytest.mark.skip()
 def test_downLoadAllZodiacsFromXSLTVariable():
     from Main import processZodiacs
     for uri, xslt in processZodiacs('../lib'):
-        # build url and download
         u = replace_url(uri)
-        r = requests.get(u)
-        assert r.status_code == 200
-
-        # load html into xml parser
-        html_soup = BeautifulSoup(r.text, 'lxml')
-        html = str(html_soup).strip()
-        assert len(html) > 0
-
-        # load xslt and transform to xml
-        dom = etree.HTML(html, base_url=uri)
-        transform = etree.XSLT(xslt)
-        newdom = transform(dom, origin="'%s'" % uri)
-        newdom_string = str(newdom)
-        assert len(newdom_string) > 0
+        from Main import downloadAndTransform
+        newdom_string = downloadAndTransform(u, xslt)
 
         uri = parse.urlparse(uri)
-        fs_path = ("transformed/%s/%s/.html" % (uri.netloc,uri.path)).lstrip('/')
+        fs_path = ("transformed/%s/%s.html" % (uri.netloc,uri.path)).lstrip('/')
         fs_dir = os.path.dirname(fs_path).lstrip('/')
 
         if not os.path.isdir(fs_dir):

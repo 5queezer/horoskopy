@@ -19,6 +19,26 @@ def processZodiacs(lib_dir):
         for z in zodiacs.split(" "):
             yield [uri_template % z, xslt]
 
+def downloadAndTransform(uri, xslt):
+    # build url and download
+    r = requests.get(uri)
+    assert r.status_code == 200
+
+    # load html into xml parser
+    html_soup = BeautifulSoup(r.text, 'lxml')
+    html = str(html_soup).strip()
+    assert len(html) > 0
+
+    # load xslt and transform to xml
+    dom = etree.HTML(html, base_url=uri)
+    transform = etree.XSLT(xslt)
+    newdom = transform(dom, origin="'%s'" % uri)
+    newdom_string = str(newdom)
+    assert len(newdom_string) > 0
+
+    return newdom_string
+
+
 def scraper_worker(q, data):
     task = q.get()
     try:
