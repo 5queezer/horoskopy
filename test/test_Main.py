@@ -67,16 +67,19 @@ def test_downloadAndSave():
         r = requests.get(replace_url(f["url"]))
         assert r.status_code == 200
 
-def test_transformXSLT():
-    base_url = "http://localhost:8088/www.astrolantis.de/tageshoroskop-fische.php"
+def test_transformXSLTforOneHoroskope():
+    base_url = "http://localhost:8088/www.astroportal.com/tageshoroskope/fische"
     r = requests.get(base_url)
-    html_soup = BeautifulSoup(r.text, 'lxml')
-    html = str(html_soup)
-    dom = etree.HTML(text=html, base_url=base_url)
+    assert r.status_code == 200
 
+    html_soup = BeautifulSoup(r.text, 'lxml')
+    html = str(html_soup).strip()
+    assert len(html) > 0
+
+    dom = etree.HTML(html, base_url=base_url)
     xslt = etree.parse('../lib/astroportal.xslt')
     transform = etree.XSLT(xslt)
-    newdom = transform(dom, uri="'%s'" % base_url)
+    newdom = transform(dom, origin="'%s'" % base_url)
     newdom_string = str(newdom)
 
     os.makedirs("compiled", 0o777, True)
@@ -86,3 +89,15 @@ def test_transformXSLT():
     f = open("compiled/aw.html", "wb")
     f.write(etree.tostring(dom, pretty_print=True))
     f.close()
+
+def test_downLoadAllZodiacsFromXSLTVariable():
+    libpath = "../lib"
+    list = os.listdir(libpath)
+    xslt_files = [f for f in os.listdir(libpath) if os.path.isfile(os.path.join(libpath, f)) and f.rfind('.xslt')]
+    for f in xslt_files:
+        xslt = etree.parse(libpath + '/' + f)
+        uri = xslt.find("{http://www.w3.org/1999/XSL/Transform}variable[@name='uri']").text.strip
+        zodiacs = xslt.find("{http://www.w3.org/1999/XSL/Transform}variable[@name='zodiacs']").text.strip
+
+        pass
+    pass
